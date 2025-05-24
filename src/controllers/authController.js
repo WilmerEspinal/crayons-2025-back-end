@@ -92,7 +92,7 @@ const login = async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.json({ token });
+    res.json({ token, roleId: user.role_id });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error en el servidor" });
@@ -100,6 +100,7 @@ const login = async (req, res) => {
     connection.release();
   }
 };
+
 const changePassword = async (req, res) => {
   const connection = await pool.getConnection();
   try {
