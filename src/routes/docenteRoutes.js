@@ -50,4 +50,10 @@ router.get("/lista-docentes/:anio?", async (req, res) => {
   }
 });
 
+// Ruta para obtener datos del docente por año
+router.get('/datos/:anio', DocenteController.getDatosDocentePorAnio);
+
+// Ruta para exportar datos del docente a Excel
+router.get('/exportar/:anio', DocenteController.exportarDatosDocenteExcel);
+
 module.exports = router;

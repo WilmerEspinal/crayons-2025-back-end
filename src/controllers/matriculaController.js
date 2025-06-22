@@ -148,6 +148,7 @@ class MatriculaController {
         );
 
         const montoC1 = c1 || 0;
+        const matriculaPrecio = matricula_precio || 0;
 
         const cuotas = {
           c1: montoC1,
@@ -162,20 +163,46 @@ class MatriculaController {
           c10: c10 || montoC1,
         };
 
+        // Determinar estados de cuotas (1 si el monto es 0)
+        const estados = {
+          matricula: matriculaPrecio === 0 ? 1 : 0,
+          c1: cuotas.c1 === 0 ? 1 : 0,
+          c2: cuotas.c2 === 0 ? 1 : 0,
+          c3: cuotas.c3 === 0 ? 1 : 0,
+          c4: cuotas.c4 === 0 ? 1 : 0,
+          c5: cuotas.c5 === 0 ? 1 : 0,
+          c6: cuotas.c6 === 0 ? 1 : 0,
+          c7: cuotas.c7 === 0 ? 1 : 0,
+          c8: cuotas.c8 === 0 ? 1 : 0,
+          c9: cuotas.c9 === 0 ? 1 : 0,
+          c10: cuotas.c10 === 0 ? 1 : 0,
+        };
+
         await Cuota.crear(
           connection,
           matriculaId,
-          matricula_precio || 0,
+          matriculaPrecio,
+          estados.matricula,
           cuotas.c1,
+          estados.c1,
           cuotas.c2,
+          estados.c2,
           cuotas.c3,
+          estados.c3,
           cuotas.c4,
+          estados.c4,
           cuotas.c5,
+          estados.c5,
           cuotas.c6,
+          estados.c6,
           cuotas.c7,
+          estados.c7,
           cuotas.c8,
+          estados.c8,
           cuotas.c9,
-          cuotas.c10
+          estados.c9,
+          cuotas.c10,
+          estados.c10
         );
 
         await AlumnoApoderado.crear(connection, alumnoId, apoderadoId);
