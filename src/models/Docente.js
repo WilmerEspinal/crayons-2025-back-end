@@ -93,6 +93,14 @@ class DocenteModel {
     const [rows] = await connection.execute(query, anio ? [anio] : []);
     return rows;
   }
+
+  static async buscarPorIdPersona(connection, idPersona) {
+    const [rows] = await connection.execute(
+      "SELECT * FROM docente WHERE id_persona = ?",
+      [idPersona]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
 }
 
 module.exports = DocenteModel;

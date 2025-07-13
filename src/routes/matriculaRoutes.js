@@ -9,7 +9,6 @@ const { verifyToken } = require("../middleware/auth");
 const MatriculaController = require("../controllers/matriculaController");
 
 // Rutas públicas
-
 router.post("/matricula", MatriculaController.registrarMatricula);
 
 module.exports = router;

@@ -476,6 +476,392 @@ const docenteController = {
     } finally {
       connection.release();
     }
+  },
+
+  // Listar alumnos matriculados por docente y año, opcionalmente por grado
+  async listarAlumnosMatriculados(req, res) {
+    const connection = await pool.getConnection();
+    try {
+      const { anio } = req.params;
+      // Permitir id_grado por query o params
+      const id_grado = req.query.id_grado || req.params.id_grado;
+      const id_persona = req.user.id_persona;
+      if (!anio) {
+        return res.status(400).json({
+          success: false,
+          message: "El año es obligatorio."
+        });
+      }
+      // Buscar el docente por id_persona
+      const docente = await DocenteModel.buscarPorIdPersona(connection, id_persona);
+      if (!docente) {
+        return res.status(404).json({
+          success: false,
+          message: "No se encontró el docente."
+        });
+      }
+      // Buscar los grados que enseña el docente ese año
+      const [grados] = await connection.query(
+        `SELECT DISTINCT dc.id_grado, g.descripcion
+         FROM docente_curso dc
+         JOIN grado g ON g.id = dc.id_grado
+         WHERE dc.id_docente = ? AND YEAR(dc.created_at) = ?`,
+        [docente.id, anio]
+      );
+      if (!grados || grados.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: "El docente no tiene grados asignados en ese año."
+        });
+      }
+      // Si se especifica un grado, validar que el docente lo tenga asignado
+      if (id_grado) {
+        const gradoAsignado = grados.find(g => g.id_grado == id_grado);
+        if (!gradoAsignado) {
+          return res.status(403).json({
+            success: false,
+            message: "No tiene permiso para ver los alumnos de ese grado en ese año."
+          });
+        }
+        // Buscar alumnos solo de ese grado
+        const [alumnos] = await connection.query(
+          `SELECT
+            e.id AS alumno_id,
+            p.dni AS alumno_dni,
+            p.nombre AS alumno_nombre,
+            p.ap_p AS alumno_apellido_paterno,
+            p.ap_m AS alumno_apellido_materno,
+            p.fecha_nacimiento,
+            g.descripcion AS grado,
+            m.fecha_matricula
+          FROM alumno e
+          JOIN persona p ON e.id_persona = p.id
+          JOIN matricula m ON m.id_alumno = e.id
+          JOIN grado g ON g.id = m.id_grado
+          WHERE YEAR(m.fecha_matricula) = ? AND g.id = ?
+          ORDER BY p.ap_p, p.ap_m, p.nombre
+          `,
+          [anio, id_grado]
+        );
+        return res.status(200).json({
+          success: true,
+          data: [{ grado: gradoAsignado.descripcion, id_grado, alumnos }],
+          anio
+        });
+      }
+      // Si no se especifica grado, mostrar todos como antes
+      const resultado = [];
+      for (const grado of grados) {
+        const [alumnos] = await connection.query(
+          `SELECT
+            e.id AS alumno_id,
+            p.dni AS alumno_dni,
+            p.nombre AS alumno_nombre,
+            p.ap_p AS alumno_apellido_paterno,
+            p.ap_m AS alumno_apellido_materno,
+            p.fecha_nacimiento,
+            g.descripcion AS grado,
+            m.fecha_matricula
+          FROM alumno e
+          JOIN persona p ON e.id_persona = p.id
+          JOIN matricula m ON m.id_alumno = e.id
+          JOIN grado g ON g.id = m.id_grado
+          WHERE YEAR(m.fecha_matricula) = ? AND g.id = ?
+          ORDER BY p.ap_p, p.ap_m, p.nombre
+          `,
+          [anio, grado.id_grado]
+        );
+        resultado.push({
+          grado: grado.descripcion,
+          id_grado: grado.id_grado,
+          alumnos
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        data: resultado,
+        anio
+      });
+    } catch (error) {
+      console.error("Error al listar alumnos matriculados por docente:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error al listar alumnos matriculados por docente.",
+        error: error.message
+      });
+    } finally {
+      connection.release();
+    }
+  },
+
+  // Registrar asistencia de un alumno
+  async registrarAsistencia(req, res) {
+    const connection = await pool.getConnection();
+    try {
+      const { id_alumno, id_docente_curso, fecha, asistio = true, observacion = null } = req.body;
+      const id_persona = req.user.id_persona;
+      if (!id_alumno || !id_docente_curso || !fecha) {
+        return res.status(400).json({
+          success: false,
+          message: "Faltan datos obligatorios (id_alumno, id_docente_curso, fecha)"
+        });
+      }
+      // Validar que el docente autenticado sea dueño del docente_curso
+      const docente = await DocenteModel.buscarPorIdPersona(connection, id_persona);
+      if (!docente) {
+        return res.status(403).json({
+          success: false,
+          message: "No tiene permisos para registrar asistencia."
+        });
+      }
+      const [rows] = await connection.query(
+        "SELECT * FROM docente_curso WHERE id = ? AND id_docente = ?",
+        [id_docente_curso, docente.id]
+      );
+      if (!rows || rows.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: "No tiene permisos sobre ese curso."
+        });
+      }
+      // Registrar asistencia
+      await connection.beginTransaction();
+      await connection.query(
+        "INSERT INTO asistencia (id_alumno, id_docente_curso, fecha, asistio, observacion) VALUES (?, ?, ?, ?, ?)",
+        [id_alumno, id_docente_curso, fecha, asistio, observacion]
+      );
+      await connection.commit();
+      return res.status(201).json({
+        success: true,
+        message: "Asistencia registrada correctamente."
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error("Error al registrar asistencia:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error al registrar asistencia.",
+        error: error.message
+      });
+    } finally {
+      connection.release();
+    }
+  },
+
+  // Exportar asistencia a Excel por fecha, curso y grado (los tres obligatorios)
+  async exportarAsistenciaExcel(req, res) {
+    const connection = await pool.getConnection();
+    try {
+      const { fecha, id_grado, id_curso } = req.query;
+      const id_persona = req.user.id_persona;
+      if (!fecha || !id_grado || !id_curso) {
+        return res.status(400).json({
+          success: false,
+          message: "Debe proporcionar fecha, id_grado e id_curso."
+        });
+      }
+      // Validar docente
+      const docente = await DocenteModel.buscarPorIdPersona(connection, id_persona);
+      if (!docente) {
+        return res.status(403).json({
+          success: false,
+          message: "No tiene permisos para exportar asistencia."
+        });
+      }
+      // Buscar el id_docente_curso correspondiente
+      const [rowsCurso] = await connection.query(
+        `SELECT dc.id, c.nombre AS nombre_curso, g.descripcion AS nombre_grado
+         FROM docente_curso dc
+         JOIN curso c ON c.id = dc.id_curso
+         JOIN grado g ON g.id = dc.id_grado
+         WHERE dc.id_docente = ? AND dc.id_curso = ? AND dc.id_grado = ?`,
+        [docente.id, id_curso, id_grado]
+      );
+      if (!rowsCurso || rowsCurso.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: "No tiene asignado ese curso y grado."
+        });
+      }
+      const id_docente_curso = rowsCurso[0].id;
+      const nombreCurso = rowsCurso[0].nombre_curso;
+      const nombreGrado = rowsCurso[0].nombre_grado;
+      // Obtener asistencias
+      const [asistencias] = await connection.query(
+        `SELECT a.*, p.dni, p.nombre, p.ap_p, p.ap_m
+         FROM asistencia a
+         JOIN alumno al ON al.id = a.id_alumno
+         JOIN persona p ON p.id = al.id_persona
+         WHERE a.id_docente_curso = ? AND a.fecha = ?
+         ORDER BY p.ap_p, p.ap_m, p.nombre`,
+        [id_docente_curso, fecha]
+      );
+      if (!asistencias || asistencias.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "No hay asistencias registradas para esos filtros."
+        });
+      }
+      // Crear Excel
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Asistencia');
+      sheet.columns = [
+        { header: 'DNI', key: 'dni', width: 12 },
+        { header: 'Nombre', key: 'nombre', width: 20 },
+        { header: 'Apellido Paterno', key: 'ap_p', width: 18 },
+        { header: 'Apellido Materno', key: 'ap_m', width: 18 },
+        { header: 'Curso', key: 'curso', width: 20 },
+        { header: 'Grado', key: 'grado', width: 12 },
+        { header: 'Fecha', key: 'fecha', width: 12 },
+        { header: 'Asistió', key: 'asistio', width: 10 },
+        { header: 'Observación', key: 'observacion', width: 25 }
+      ];
+      asistencias.forEach(a => {
+        sheet.addRow({
+          dni: a.dni,
+          nombre: a.nombre,
+          ap_p: a.ap_p,
+          ap_m: a.ap_m,
+          curso: nombreCurso,
+          grado: nombreGrado,
+          fecha: a.fecha,
+          asistio: a.asistio ? 'Sí' : 'No',
+          observacion: a.observacion || ''
+        });
+      });
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      let nombreArchivo = `asistencia_${fecha}_${nombreGrado}_${nombreCurso}`;
+      res.setHeader('Content-Disposition', `attachment; filename=${nombreArchivo}.xlsx`);
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      console.error("Error al exportar asistencia:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error al exportar asistencia.",
+        error: error.message
+      });
+    } finally {
+      connection.release();
+    }
+  },
+
+  // Listar asistencias por fecha, curso y grado
+  async listarAsistencias(req, res) {
+    const connection = await pool.getConnection();
+    try {
+      const { fecha, id_grado, id_curso } = req.query;
+      const id_persona = req.user.id_persona;
+      if (!fecha || !id_grado || !id_curso) {
+        return res.status(400).json({
+          success: false,
+          message: "Debe proporcionar fecha, id_grado e id_curso."
+        });
+      }
+      // Validar docente
+      const docente = await DocenteModel.buscarPorIdPersona(connection, id_persona);
+      if (!docente) {
+        return res.status(403).json({
+          success: false,
+          message: "No tiene permisos para ver asistencias."
+        });
+      }
+      // Buscar el id_docente_curso correspondiente
+      const [rowsCurso] = await connection.query(
+        `SELECT dc.id
+         FROM docente_curso dc
+         WHERE dc.id_docente = ? AND dc.id_curso = ? AND dc.id_grado = ?`,
+        [docente.id, id_curso, id_grado]
+      );
+      if (!rowsCurso || rowsCurso.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: "No tiene asignado ese curso y grado."
+        });
+      }
+      const id_docente_curso = rowsCurso[0].id;
+      // Obtener asistencias
+      const [asistencias] = await connection.query(
+        `SELECT a.*, p.dni, p.nombre, p.ap_p, p.ap_m
+         FROM asistencia a
+         JOIN alumno al ON al.id = a.id_alumno
+         JOIN persona p ON p.id = al.id_persona
+         WHERE a.id_docente_curso = ? AND a.fecha = ?
+         ORDER BY p.ap_p, p.ap_m, p.nombre`,
+        [id_docente_curso, fecha]
+      );
+      return res.status(200).json({
+        success: true,
+        data: asistencias
+      });
+    } catch (error) {
+      console.error("Error al listar asistencias:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error al listar asistencias.",
+        error: error.message
+      });
+    } finally {
+      connection.release();
+    }
+  },
+
+  // Obtener los cursos y grados del docente autenticado por año
+  async misCursosPorAnio(req, res) {
+    const connection = await pool.getConnection();
+    try {
+      const { anio } = req.params;
+      const id_persona = req.user.id_persona;
+      if (!anio) {
+        return res.status(400).json({
+          success: false,
+          message: "El año es obligatorio."
+        });
+      }
+      // Buscar el docente por id_persona
+      const docente = await DocenteModel.buscarPorIdPersona(connection, id_persona);
+      if (!docente) {
+        return res.status(404).json({
+          success: false,
+          message: "No se encontró el docente."
+        });
+      }
+      // Buscar los cursos y grados asignados ese año
+      const [cursos] = await connection.query(
+        `SELECT dc.id AS id_docente_curso, c.id AS id_curso, c.nombre AS curso, g.id AS id_grado, g.descripcion AS grado
+         FROM docente_curso dc
+         JOIN curso c ON c.id = dc.id_curso
+         JOIN grado g ON g.id = dc.id_grado
+         WHERE dc.id_docente = ? AND YEAR(dc.created_at) = ?
+         ORDER BY g.descripcion, c.nombre`,
+        [docente.id, anio]
+      );
+      // Buscar datos personales del docente
+      const [datos] = await connection.query(
+        `SELECT p.dni, p.nombre, p.ap_p, p.ap_m
+         FROM persona p
+         WHERE p.id = ?`,
+        [docente.id_persona]
+      );
+      return res.status(200).json({
+        success: true,
+        docente: {
+          id_docente: docente.id,
+          ...datos[0]
+        },
+        cursos
+      });
+    } catch (error) {
+      console.error("Error al obtener cursos del docente autenticado:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error al obtener cursos del docente.",
+        error: error.message
+      });
+    } finally {
+      connection.release();
+    }
   }
 };
 

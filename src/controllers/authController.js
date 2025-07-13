@@ -87,7 +87,7 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role_id: user.role_id },
+      { id: user.id, id_persona: user.id_persona, username: user.username, role_id: user.role_id },
       process.env.JWT_SECRET || "secretkey",
       { expiresIn: "1h" }
     );
@@ -142,8 +142,26 @@ const changePassword = async (req, res) => {
   }
 };
 
+const logout = async (req, res) => {
+  try {
+    // En JWT, el logout se maneja principalmente en el frontend
+    // invalidando el token. Aquí solo confirmamos el logout.
+    res.json({ 
+      message: "Sesión cerrada exitosamente",
+      success: true 
+    });
+  } catch (error) {
+    console.error("Error en logout:", error);
+    res.status(500).json({ 
+      message: "Error al cerrar sesión",
+      success: false 
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   changePassword,
+  logout,
 };

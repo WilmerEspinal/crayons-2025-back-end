@@ -3,6 +3,7 @@ const router = express.Router();
 
 const DocenteController = require("../controllers/docenteController");
 const { pool } = require("../config/database");
+const { verifyToken } = require("../middleware/auth");
 
 // Ruta para registrar docente
 router.post("/registrar-docente", async (req, res) => {
@@ -55,5 +56,20 @@ router.get('/datos/:anio', DocenteController.getDatosDocentePorAnio);
 
 // Ruta para exportar datos del docente a Excel
 router.get('/exportar/:anio', DocenteController.exportarDatosDocenteExcel);
+
+// Ruta para que el docente vea los alumnos de los grados que enseña por año
+router.get("/alumnos-matriculados/:anio", verifyToken, DocenteController.listarAlumnosMatriculados);
+
+// Ruta para que el docente autenticado vea solo sus cursos y datos por año
+router.get("/mis-cursos/:anio", verifyToken, DocenteController.misCursosPorAnio);
+
+// Ruta para registrar asistencia de un alumno
+router.post("/registrar-asistencia", verifyToken, DocenteController.registrarAsistencia);
+
+// Ruta para exportar asistencia a Excel por fecha, curso y grado
+router.get("/exportar-asistencia", verifyToken, DocenteController.exportarAsistenciaExcel);
+
+// Ruta para listar asistencias por fecha, curso y grado
+router.get("/listar-asistencias", verifyToken, DocenteController.listarAsistencias);
 
 module.exports = router;

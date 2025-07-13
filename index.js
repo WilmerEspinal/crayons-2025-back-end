@@ -9,6 +9,7 @@ const reniecRoutes = require("./src/routes/reniecRoutes");
 const alumnoRoutes = require("./src/routes/alumnoRoutes");
 const docenteRoutes = require("./src/routes/docenteRoutes");
 const periodoPagoasRoutes = require("./src/routes/periodoPagoasRoutes");
+const cuotasRoutes = require("./src/routes/cuotasRoutes");
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/api/alumno", alumnoRoutes);
 app.use("/api/docente", docenteRoutes);
 
 app.use("/api/cuotas", periodoPagoasRoutes);
+app.use("/api/cuotas", cuotasRoutes);
 
 // Ruta de prueba
 app.get("/", (req, res) => {

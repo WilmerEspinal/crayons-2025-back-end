@@ -4,6 +4,7 @@ const {
   register,
   login,
   changePassword,
+  logout,
 } = require("../controllers/authController");
 const { verifyToken } = require("../middleware/auth");
 
@@ -13,5 +14,6 @@ router.post("/login", login);
 
 // Rutas protegidas (requieren token válido)
 router.post("/change-password", changePassword);
+router.post("/logout", verifyToken, logout);
 
 module.exports = router;

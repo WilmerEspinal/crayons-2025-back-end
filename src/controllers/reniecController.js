@@ -13,7 +13,7 @@ const buscarPersonaPorDni = async (req, res) => {
       {
         headers: {
           Authorization:
-            "Bearer apis-token-15116.UF1dVR8QDPEdTUmEE7HvvqqKvvglNodx",
+            "Bearer apis-token-16255.2C3ip3B19m0NhKnof7HaXp8sL2iepycb",
         },
       }
     );

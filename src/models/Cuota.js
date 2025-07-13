@@ -39,6 +39,33 @@ class CuotasModel {
     );
     return result.insertId;
   }
+
+  // Nuevo método para listar cuotas por id_persona (alumno autenticado)
+  static async listarPorIdPersona(idPersona) {
+    // 1. Buscar id del alumno
+    const [alumnoRows] = await db.pool.query(
+      'SELECT id FROM alumno WHERE id_persona = ?',
+      [idPersona]
+    );
+    if (alumnoRows.length === 0) return null;
+    const idAlumno = alumnoRows[0].id;
+
+    // 2. Buscar matrículas del alumno
+    const [matriculaRows] = await db.pool.query(
+      'SELECT id FROM matricula WHERE id_alumno = ?',
+      [idAlumno]
+    );
+    if (matriculaRows.length === 0) return null;
+    // Si hay varias matrículas, devolvemos todas las cuotas
+    const matriculaIds = matriculaRows.map(row => row.id);
+
+    // 3. Buscar cuotas de esas matrículas
+    const [cuotasRows] = await db.pool.query(
+      `SELECT * FROM cuotas WHERE id_matricula IN (${matriculaIds.map(() => '?').join(',')})`,
+      matriculaIds
+    );
+    return cuotasRows;
+  }
 }
 
 module.exports = CuotasModel;
