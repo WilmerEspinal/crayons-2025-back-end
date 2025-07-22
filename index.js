@@ -10,6 +10,7 @@ const alumnoRoutes = require("./src/routes/alumnoRoutes");
 const docenteRoutes = require("./src/routes/docenteRoutes");
 const periodoPagoasRoutes = require("./src/routes/periodoPagoasRoutes");
 const cuotasRoutes = require("./src/routes/cuotasRoutes");
+const pagoRoutes = require("./src/routes/pagoRoutes");
 
 const app = express();
 
@@ -31,6 +32,9 @@ app.use("/api/docente", docenteRoutes);
 
 app.use("/api/cuotas", periodoPagoasRoutes);
 app.use("/api/cuotas", cuotasRoutes);
+
+app.use("/api/pago", pagoRoutes)
+
 
 // Ruta de prueba
 app.get("/", (req, res) => {

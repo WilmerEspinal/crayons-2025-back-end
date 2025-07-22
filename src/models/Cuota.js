@@ -66,6 +66,153 @@ class CuotasModel {
     );
     return cuotasRows;
   }
+
+  // Nuevo método para obtener cuotas con datos completos por DNI y año
+  static async obtenerCuotasCompletasPorDniYAnio(dni, anio) {
+    const query = `
+      SELECT 
+        -- Datos del estudiante
+        p.dni,
+        p.nombre,
+        p.ap_p,
+        p.ap_m,
+        p.fecha_nacimiento,
+        
+        -- Datos de la matrícula
+        m.id AS id_matricula,
+        m.fecha_matricula,
+        m.dni_entregado,
+        m.certificado_estudios,
+        
+        -- Datos del grado
+        g.id AS id_grado,
+        g.descripcion AS grado,
+        
+        -- Datos de las cuotas
+        c.id AS id_cuota,
+        c.matricula_precio,
+        c.matricula_estado,
+        c.c1, c.c1_estado,
+        c.c2, c.c2_estado,
+        c.c3, c.c3_estado,
+        c.c4, c.c4_estado,
+        c.c5, c.c5_estado,
+        c.c6, c.c6_estado,
+        c.c7, c.c7_estado,
+        c.c8, c.c8_estado,
+        c.c9, c.c9_estado,
+        c.c10, c.c10_estado,
+        c.created_at,
+        c.updated_at
+        
+      FROM persona p
+      INNER JOIN alumno a ON a.id_persona = p.id
+      INNER JOIN matricula m ON m.id_alumno = a.id
+      INNER JOIN grado g ON g.id = m.id_grado
+      INNER JOIN cuotas c ON c.id_matricula = m.id
+      WHERE p.dni = ? AND YEAR(m.fecha_matricula) = ?
+      ORDER BY m.fecha_matricula DESC, c.created_at DESC
+    `;
+    
+    const [rows] = await db.pool.query(query, [dni, anio]);
+    return rows;
+  }
+
+  // Método para actualizar el estado de una cuota específica
+  static async actualizarEstadoCuota(idCuota, tipoCuota, nuevoEstado) {
+    let campoEstado;
+    let campoMonto;
+    
+    // Determinar qué campo actualizar según el tipo de cuota
+    switch (tipoCuota.toLowerCase()) {
+      case 'matricula':
+        campoEstado = 'matricula_estado';
+        break;
+      case '1':
+      case 'c1':
+        campoEstado = 'c1_estado';
+        break;
+      case '2':
+      case 'c2':
+        campoEstado = 'c2_estado';
+        break;
+      case '3':
+      case 'c3':
+        campoEstado = 'c3_estado';
+        break;
+      case '4':
+      case 'c4':
+        campoEstado = 'c4_estado';
+        break;
+      case '5':
+      case 'c5':
+        campoEstado = 'c5_estado';
+        break;
+      case '6':
+      case 'c6':
+        campoEstado = 'c6_estado';
+        break;
+      case '7':
+      case 'c7':
+        campoEstado = 'c7_estado';
+        break;
+      case '8':
+      case 'c8':
+        campoEstado = 'c8_estado';
+        break;
+      case '9':
+      case 'c9':
+        campoEstado = 'c9_estado';
+        break;
+      case '10':
+      case 'c10':
+        campoEstado = 'c10_estado';
+        break;
+      default:
+        throw new Error('Tipo de cuota no válido');
+    }
+
+    const query = `UPDATE cuotas SET ${campoEstado} = ? WHERE id = ?`;
+    const [result] = await db.pool.query(query, [nuevoEstado ? 1 : 0, idCuota]);
+    
+    if (result.affectedRows === 0) {
+      throw new Error('No se encontró la cuota especificada');
+    }
+    
+    return result.affectedRows > 0;
+  }
+
+  // Actualizar estado de cuota por webhook usando DNI, año y tipo de cuota
+  static async actualizarEstadoCuotaPorWebhook(dni, anio, tipo_cuota) {
+    const cuotas = await this.obtenerCuotasCompletasPorDniYAnio(dni, anio);
+    if (!cuotas || cuotas.length === 0) return false;
+    const cuota = cuotas[0];
+    const idCuota = cuota.id_cuota;
+    return this.actualizarEstadoCuota(idCuota, tipo_cuota, true);
+  }
+
+  // Método para obtener una cuota específica por ID
+  static async obtenerCuotaPorId(idCuota) {
+    const query = `
+      SELECT 
+        c.*,
+        p.dni,
+        p.nombre,
+        p.ap_p,
+        p.ap_m,
+        g.descripcion AS grado,
+        m.fecha_matricula
+      FROM cuotas c
+      INNER JOIN matricula m ON m.id = c.id_matricula
+      INNER JOIN alumno a ON a.id = m.id_alumno
+      INNER JOIN persona p ON p.id = a.id_persona
+      INNER JOIN grado g ON g.id = m.id_grado
+      WHERE c.id = ?
+    `;
+    
+    const [rows] = await db.pool.query(query, [idCuota]);
+    return rows.length > 0 ? rows[0] : null;
+  }
 }
 
 module.exports = CuotasModel;
