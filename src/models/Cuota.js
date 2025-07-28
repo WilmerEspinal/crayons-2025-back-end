@@ -183,13 +183,76 @@ class CuotasModel {
   }
 
   // Actualizar estado de cuota por webhook usando DNI, año y tipo de cuota
+  static async actualizarEstadoYPrecioCuota(idCuota, tipoCuota, nuevoEstado, nuevoMonto = 0) {
+    let campoEstado, campoMonto;
+  
+    switch (tipoCuota.toLowerCase()) {
+      case 'matricula':
+        campoEstado = 'matricula_estado';
+        campoMonto = 'matricula_precio';
+        break;
+      case '1': case 'c1':
+        campoEstado = 'c1_estado';
+        campoMonto = 'c1';
+        break;
+      case '2': case 'c2':
+        campoEstado = 'c2_estado';
+        campoMonto = 'c2';
+        break;
+      case '3': case 'c3':
+        campoEstado = 'c3_estado';
+        campoMonto = 'c3';
+        break;
+      case '4': case 'c4':
+        campoEstado = 'c4_estado';
+        campoMonto = 'c4';
+        break;
+      case '5': case 'c5':
+        campoEstado = 'c5_estado';
+        campoMonto = 'c5';
+        break;
+      case '6': case 'c6':
+        campoEstado = 'c6_estado';
+        campoMonto = 'c6';
+        break;
+      case '7': case 'c7':
+        campoEstado = 'c7_estado';
+        campoMonto = 'c7';
+        break;
+      case '8': case 'c8':
+        campoEstado = 'c8_estado';
+        campoMonto = 'c8';
+        break;
+      case '9': case 'c9':
+        campoEstado = 'c9_estado';
+        campoMonto = 'c9';
+        break;
+      case '10': case 'c10':
+        campoEstado = 'c10_estado';
+        campoMonto = 'c10';
+        break;
+      default:
+        throw new Error('Tipo de cuota no válido');
+    }
+  
+    const query = `UPDATE cuotas SET ${campoEstado} = ?, ${campoMonto} = ? WHERE id = ?`;
+    const [result] = await db.pool.query(query, [nuevoEstado ? 1 : 0, nuevoMonto, idCuota]);
+  
+    if (result.affectedRows === 0) {
+      throw new Error('No se encontró la cuota especificada');
+    }
+  
+    return true;
+  }
+  
   static async actualizarEstadoCuotaPorWebhook(dni, anio, tipo_cuota) {
     const cuotas = await this.obtenerCuotasCompletasPorDniYAnio(dni, anio);
     if (!cuotas || cuotas.length === 0) return false;
     const cuota = cuotas[0];
     const idCuota = cuota.id_cuota;
-    return this.actualizarEstadoCuota(idCuota, tipo_cuota, true);
+    return this.actualizarEstadoYPrecioCuota(idCuota, tipo_cuota, true, 0);
   }
+  
 
   // Método para obtener una cuota específica por ID
   static async obtenerCuotaPorId(idCuota) {

@@ -1,0 +1,192 @@
+{
+  "info": {
+    "name": "API Justificaciones - Postman Collection",
+    "description": "Ejemplos para probar las APIs de justificaciones con Cloudinary"
+  },
+  "item": [
+    {
+      "name": "Crear Justificación",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer TU_TOKEN_JWT_AQUI",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "pdf",
+              "type": "file",
+              "src": "ruta/a/tu/archivo.pdf"
+            },
+            {
+              "key": "titulo",
+              "value": "Cita médica - Fiebre",
+              "type": "text"
+            },
+            {
+              "key": "descripcion",
+              "value": "Tuve fiebre alta y no pude asistir a clases",
+              "type": "text"
+            },
+            {
+              "key": "tipo_justificacion",
+              "value": "medica",
+              "type": "text"
+            },
+            {
+              "key": "fecha_falta",
+              "value": "2024-01-15",
+              "type": "text"
+            },
+            {
+              "key": "id_docente",
+              "value": "1",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:3000/api/justificaciones/crear",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "justificaciones", "crear"]
+        }
+      }
+    },
+    {
+      "name": "Obtener Mis Justificaciones (Alumno)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer TU_TOKEN_JWT_AQUI",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/api/justificaciones/mis-justificaciones",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "justificaciones", "mis-justificaciones"]
+        }
+      }
+    },
+    {
+      "name": "Obtener Justificaciones por Docente",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer TU_TOKEN_JWT_AQUI",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/api/justificaciones/docente/justificaciones",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "justificaciones", "docente", "justificaciones"]
+        }
+      }
+    },
+    {
+      "name": "Obtener Justificación por ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer TU_TOKEN_JWT_AQUI",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/api/justificaciones/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "justificaciones", "1"]
+        }
+      }
+    },
+    {
+      "name": "Actualizar Estado de Justificación",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer TU_TOKEN_JWT_AQUI",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"estado\": \"aprobada\",\n  \"comentario_revision\": \"Justificación aprobada. Documento válido.\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/api/justificaciones/1/estado",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "justificaciones", "1", "estado"]
+        }
+      }
+    },
+    {
+      "name": "Obtener Todas las Justificaciones (Admin)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer TU_TOKEN_JWT_AQUI",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/api/justificaciones/admin/todas",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "justificaciones", "admin", "todas"]
+        }
+      }
+    },
+    {
+      "name": "Eliminar Justificación",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer TU_TOKEN_JWT_AQUI",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/api/justificaciones/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "justificaciones", "1"]
+        }
+      }
+    }
+  ]
+} 

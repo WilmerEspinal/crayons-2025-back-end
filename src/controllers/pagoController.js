@@ -1,5 +1,6 @@
+const mercadopago = require('mercadopago');
+const { Preference, Payment } = require('mercadopago'); // Importar Payment correctamente
 const mp = require('../services/mercadoPago');
-const { Preference } = require('mercadopago');
 const Cuota = require('../models/Cuota');
 const pool = require('../config/database');
 
@@ -111,7 +112,8 @@ const generarPagoCuota = async (req, res) => {
     }
 
     // Crear la referencia externa para identificar el pago
-    const external_reference = `${alumno.dni}-${anio}-${tipo_cuota.toLowerCase()}`;
+    const external_reference = String(cuota.id_cuota);
+
 
     // Crear preferencia de pago en Mercado Pago usando la nueva sintaxis
     const preferenciaData = {
@@ -130,14 +132,14 @@ const generarPagoCuota = async (req, res) => {
           number: String(alumno.dni) // Asegurar que sea string
         }
       },
-      external_reference: external_reference,
+      external_reference,
       back_urls: {
-        success: "https://tuapp.com/pago-exitoso",
-        failure: "https://tuapp.com/pago-fallido",
-        pending: "https://tuapp.com/pago-pendiente"
+        success: "https://905247ace5d3.ngrok-free.app/pago-exitoso",
+        failure: "https://905247ace5d3.ngrok-free.app/pago-fallido",
+        pending: "https://905247ace5d3.ngrok-free.app/pago-pendiente"
       },
       auto_return: "approved",
-      notification_url: "https://tu-dominio.com/webhook/mercadopago" // Añadir URL de notificación
+      notification_url: "https://905247ace5d3.ngrok-free.app/api/pago/mercadopago/webhook" // Añadir URL de notificación
     };
     console.log('Preferencia a enviar a Mercado Pago:', JSON.stringify(preferenciaData, null, 2));
 
@@ -146,7 +148,7 @@ const generarPagoCuota = async (req, res) => {
 
     res.json({ 
       success: true, 
-      init_point: response.body?.sandbox_init_point || response.body?.init_point || response.sandbox_init_point || response.init_point, 
+      init_point: response.body?.init_point || response.body?.init_point || response.init_point || response.init_point, 
       descripcion, 
       monto,
       preference_id: response.body?.id || response.id
@@ -159,34 +161,110 @@ const generarPagoCuota = async (req, res) => {
   }
 };
 
+
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 const webhookMercadoPago = async (req, res) => {
   try {
-    const payment = req.body;
+    const { action, data, topic } = req.body;
+    console.log('📥 Webhook recibido:', req.body);
 
-    // Solo procesar pagos aprobados
-    if (payment.type === 'payment' && payment.data && payment.data.id) {
-      // Obtener detalles del pago desde Mercado Pago
-      const mpPayment = await Preference.mp.payment.findById(payment.data.id);
-      const status = mpPayment.body.status;
-      const description = mpPayment.body.description;
-      const external_reference = mpPayment.body.external_reference;
+    // Responder rápido al webhook de Mercado Pago
+    res.sendStatus(200);
 
-      // Solo si el pago fue aprobado
-      if (status === 'approved') {
-        // Usar external_reference para identificar la cuota: "DNI-ANIO-TIPO_CUOTA"
-        const ref = external_reference || description;
-        if (ref) {
-          const [dni, anio, tipo_cuota] = ref.split('-');
-          if (dni && anio && tipo_cuota) {
-            await Cuota.actualizarEstadoCuotaPorWebhook(dni, anio, tipo_cuota);
+    // Ignorar eventos no deseados
+    if (topic === 'merchant_order') {
+      console.log('ℹ️ Webhook de merchant_order ignorado');
+      return;
+    }
+
+  
+
+    // Procesar pago actualizado
+if ((action === 'payment.created' || action === 'payment.updated') && data?.id) {
+  const paymentId = Number(data.id);
+      console.log(`⏳ Procesando payment.updated: ${paymentId}`);
+      await delay(2000); // Espera pequeña por consistencia
+
+      let payment = null;
+      let retries = 5;
+
+      while (retries > 0 && !payment) {
+        try {
+          const paymentResource = new Payment(mp);
+          const response = await paymentResource.get({ id: paymentId });
+
+          if (response?.body?.id || response?.id) {
+            payment = response.body || response;
+            console.log(`✅ Pago encontrado: ID ${payment.id} | Status: ${payment.status}`);
+            break;
+          }
+        } catch (err) {
+          console.warn(`❌ Error intento ${6 - retries} al obtener pago ${paymentId}: ${err.message}`);
+          retries--;
+          if (retries > 0) {
+            const waitTime = (6 - retries) * 3000;
+            console.log(`⏳ Esperando ${waitTime / 1000} segundos antes del siguiente intento...`);
+            await delay(waitTime);
           }
         }
       }
+
+      if (!payment) {
+        console.error(`❌ No se pudo obtener el pago ${paymentId} tras 5 intentos`);
+        return;
+      }
+
+      // Procesar si el pago fue aprobado
+      if (payment.status === 'approved') {
+        const idCuota = Number(payment.external_reference);
+        let tipo_cuota = '';
+
+        const itemTitle =
+          payment?.additional_info?.items?.[0]?.title ||
+          payment?.description ||
+          payment?.reason ||
+          '';
+
+        const lowerTitle = itemTitle.toLowerCase();
+
+        if (lowerTitle.includes('matricula')) {
+          tipo_cuota = 'matricula';
+        } else {
+          const match = lowerTitle.match(/cuota\s*(\d+)/i);
+          tipo_cuota = match ? match[1] : '';
+        }
+
+        console.log(`📄 Datos del pago:
+  - Payment ID: ${payment.id}
+  - Estado: ${payment.status}
+  - Cuota detectada: ${tipo_cuota}
+  - ID de cuota (DB): ${idCuota}
+  - Monto: ${payment.transaction_amount}
+  - Método: ${payment.payment_method_id}`);
+
+        if (idCuota && tipo_cuota) {
+          try {
+            const actualizado = await Cuota.actualizarEstadoYPrecioCuota(idCuota, tipo_cuota, true, 0);
+            if (actualizado) {
+              console.log(`✅ Cuota ${idCuota} (${tipo_cuota}) marcada como pagada y monto puesto a 0`);
+            } else {
+              console.warn(`⚠️ No se pudo actualizar la cuota ${idCuota} (${tipo_cuota})`);
+            }
+          } catch (err) {
+            console.error(`❌ Error al actualizar la cuota ${idCuota}:`, err);
+          }
+        } else {
+          console.error('❌ No se pudo determinar el ID o tipo de cuota desde el pago');
+          console.log('🔎 Datos completos del payment:', JSON.stringify(payment, null, 2));
+        }
+      } else {
+        console.log(`🔁 Pago aún no aprobado (status: ${payment.status})`);
+      }
     }
-    res.status(200).send('OK');
   } catch (error) {
-    console.error('Error en webhook de Mercado Pago:', error);
-    res.status(500).send('Error');
+    console.error('❌ Error general en el webhook de Mercado Pago:', error);
   }
 };
 
